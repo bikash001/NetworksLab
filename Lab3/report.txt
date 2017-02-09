@@ -1,0 +1,39 @@
+Exercise 3.1
+----------------
+1) Transport layer protocol used in dns query is UDP.
+
+2) Destination MAC address for ARP request/response is 00:00:00:00:00:00.
+
+3) ICMP header type for Echo request: 8.
+	ICMP header type for Echo reply: 0.
+	Size of the data field is 48 bytes.
+	Data found in one of the packet is 7f86060000000000101112131415161718191a1b1c1d1e1f...
+
+4) User-agent filed in http get request: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:50.0) Gecko/20100101 Firefox/50.0
+
+5) Following are the filters used.
+	a) udp && not ntp && ip.src == 192.168.1.100
+	b) tcp && not ssl
+
+
+Exercise 2.2
+----------------------------
+A's IP address is set to 192.168.123.1 and B's IP address is set to 192.168.123.2 through GUI.
+Netmask is set to 255.255.255.0, gateway in B is set to 192.168.123.1 and dns in B is set to 10.6.0.11.
+
+Following are the commands used in A to allow packet forwarding:-
+1) sudo echo 1 > /proc/sys/net/ipv4/ip_forward
+	This command is used to enable IP forwarding
+
+2)	sudo iptables -t nat -A POSTROUTING --out-interface wlan0 -j MASQUERADE
+	This command is used to set the outgoing interface for ip forwarding.
+
+3)	sudo iptables -A FORWARD --in-interface eth0 -j ACCEPT
+	This command is used to set the incoming interface for ip forwarding.
+
+
+Exercise 3.2
+---------------------------------
+1) Abhik 10.6.15.92 and Bob 10.22.21.249. First message is "Hi Abhik!" and last message is ":)"
+2) The file is splitted into 10 packets. The type of the file is jpeg.
+3) Watch Dogs is the game, Bob was taking about.

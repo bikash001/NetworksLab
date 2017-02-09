@@ -1,0 +1,9 @@
+1) To compile all files, run make.
+2) To compile individual file, run make <filename.class>
+3) To remove all .class files, run make clean
+4) To run server program, run java <filename> <port>
+   example:- java UdpServer 5000
+5) To run client program, run java <filename> <port>
+   example:- java TcpClient localhost 5000
+6) I have checked with multiple test cases, but didn't
+   find any bug/errors in the programs.

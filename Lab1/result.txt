@@ -1,0 +1,2 @@
+The average time taken to echo a message of length 12 byte is 193 microsecond in tcp protocol and 116 microsecond in udp protocol.
+This shows that tcp protocos is slower than udp protocol.This is because of tcp's congestion control mechanism reliable transfer of data.
