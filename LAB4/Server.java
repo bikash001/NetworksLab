@@ -140,8 +140,17 @@ class EmailThread extends Thread {
                     				bd.append(ln).append("\n");
                     				ln = raf.readLine();
                     			}
-                    			out.writeUTF(bd.toString());
-                                out.writeUTF("###");
+                    			int strLen = bd.length();
+								int start = 0;
+								while (strLen > 60000) {
+									out.writeUTF(bd.substring(start,start+60000));
+									start += 60000;
+									strLen -= 60000;
+								}
+								if (strLen != 0) {
+									out.writeUTF(bd.substring(start,start+strLen));	//send the message
+								}
+                    			out.writeUTF("###");
                     		}
                     		// no messages, or file pointer at the end
                     		else {
@@ -262,6 +271,10 @@ class EmailThread extends Thread {
                     			BufferedWriter tbr = new BufferedWriter(new FileWriter(toFile));
                     			tbr.append("From: "+currUserName+"\n");
                     			tbr.append("To: "+cmds[1]+"\n");
+                    			while(!str.endsWith("###")) {
+                    				tbr.append(str);
+                    				str = in.readUTF();
+                    			}
                     			tbr.append(str);
                     			tbr.append("\n");
                                 tbr.close();

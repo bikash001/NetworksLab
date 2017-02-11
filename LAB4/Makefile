@@ -8,3 +8,4 @@ Server.class: Server.java
 
 clean:
 	rm *.class
+	rm Spool/*

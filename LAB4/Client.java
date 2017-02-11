@@ -99,16 +99,25 @@ public class Client {
 										String subject = scanner.nextLine();	//get message subject
 										System.out.print("Type-Message: ");
 										StringBuilder builder = new StringBuilder("Subject: ");
-										builder.append("Subject: ").append(subject).append("\n");
+										builder.append(subject).append("\n");
 										String msg = scanner.nextLine();
 
 										//get message content
 										while (!msg.endsWith("###")) {
-											builder.append(msg);
+											builder.append(msg).append("\n");
 											msg = scanner.nextLine();
 										}
 										builder.append(msg.substring(0,msg.length()-3)).append("\n###");
-										out.writeUTF(builder.toString());	//send the message
+										int strLen = builder.length();
+										int start = 0;
+										while (strLen > 60000) {
+											out.writeUTF(builder.substring(start,start+60000));
+											start += 60000;
+											strLen -= 60000;
+										}
+										if (strLen != 0) {
+											out.writeUTF(builder.substring(start,start+strLen));	//send the message
+										}
 										printResponse(in);	//print response
 									} else {	//invalid command
 										System.out.print("INVALID INPUT");
