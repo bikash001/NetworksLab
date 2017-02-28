@@ -3,3 +3,4 @@ To run the server enter java Server <port>
 		Example: java Server 1080
 To run the client enter java Client <host> <port>
 		Example: java Client localhost 1080
+There is a folder called "Spool" inside the root directory. This contains all the spool files.

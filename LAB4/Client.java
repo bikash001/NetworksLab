@@ -3,6 +3,10 @@ import java.net.*;
 import java.util.Scanner;
 
 public class Client {
+	private static Socket socket = null;
+	private static DataInputStream in = null;
+	private static DataOutputStream out = null;
+
 	public static void main(String[] args) {
 		
 		// Check if valid argument are provided
@@ -12,9 +16,9 @@ public class Client {
 
 		int port = Integer.valueOf(args[1]);	//port no.
 		Scanner scanner = new Scanner(System.in);	//object for taking input from terminal
-		Socket socket = null;	//client socket
-		DataOutputStream out = null;	//output buffer of the socket
-		DataInputStream in = null;	//input buffer of the socket
+		// Socket socket = null;	//client socket
+		// DataOutputStream out = null;	//output buffer of the socket
+		// DataInputStream in = null;	//input buffer of the socket
 		String line;
 		
 		try {
@@ -107,7 +111,11 @@ public class Client {
 											builder.append(msg).append("\n");
 											msg = scanner.nextLine();
 										}
-										builder.append(msg.substring(0,msg.length()-3)).append("\n###");
+										if (msg.length() > 3) {
+											builder.append(msg.substring(0,msg.length()-3)).append("\n###");
+										} else {
+											builder.append("###");
+										}
 										int strLen = builder.length();
 										int start = 0;
 										while (strLen > 60000) {
@@ -173,6 +181,18 @@ public class Client {
 			System.out.println("");
 		} catch (IOException e) {
 			e.printStackTrace();
+			try{
+				if (in != null) {
+					in.close();
+				}
+				if (out != null) {
+					out.close();
+				}
+				if (socket != null) {
+					socket.close();
+				}
+			} catch (IOException ioe) {
+			}
 		}
 	}
 }

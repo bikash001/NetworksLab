@@ -1,0 +1,104 @@
+Script started on Sun 12 Feb 2017 10:49:45 AM IST
+]0;bikash@bikash-HP: ~/cs3200/LAB4bikash@bikash-HP:~/cs3200/LAB4$ make
+javac Server.java
+javac Client.java
+]0;bikash@bikash-HP: ~/cs3200/LAB4bikash@bikash-HP:~/cs3200/LAB4$ java Client localhost 1080
+Main-Prompt>SetUser bikash
+User does not exist.
+
+Main-Prompt>Adduser bikash
+Server Response:
+User created successfully.
+
+Main-Prompt>Setuser     tUser bikash
+Welcome to your mailbox.
+There are 0 messages in your mailbox.
+
+Sub-Prompt-bikash>Se  Read
+Server Response:
+No More Mail
+
+Sub-Prompt-bikash>Delete
+Server Response:
+No More Mail
+
+Sub-Prompt-bikash>Send ajay
+Type-Subject: Test Mail
+Type-Message: Hi, hw r u?
+###
+Server Response:
+User does not exist.
+
+Sub-Prompt-bikash>Done
+Server Response:
+User closed successfully.
+
+Main-Prompt>Adduser ajay
+Server Response:
+User created successfully.
+
+Main-Prompt>SetUser bikash
+Welcome to your mailbox.
+There are 0 messages in your mailbox.
+
+Sub-Prompt-bikash>Send ajay
+Type-Subject: Test Mail 1
+Type-Message: Hi, hw r u?
+###
+Server Response:
+Message sent successfully.
+Sub-Prompt-bikash>Send ajay
+Type-Subject: Test Mail 2
+Type-Message: Have u received my earlier mail?
+###
+Server Response:
+Message sent successfully.
+Sub-Prompt-bikash>Done
+Server Response:
+User closed successfully.
+
+Main-Prompt>SetUser ajay
+Welcome to your mailbox.
+There are 2 messages in your mailbox.
+
+Sub-Prompt-ajay>Read
+Server Response:
+From: bikash
+To: ajay
+Subject: Test Mail 1
+Hi, hw r u?
+
+Sub-Prompt-ajay>Delete
+Server Response:
+Message Deleted
+
+Sub-Prompt-ajay>Done    Read
+Server Response:
+No More Mail
+
+Sub-Prompt-ajay>Deo  one
+Server Response:
+User closed successfully.
+
+Main-Prompt>SetUser ajay
+Welcome to your mailbox.
+There are 1 messages in your mailbox.
+
+Sub-Prompt-ajay>Read
+Server Response:
+From: bikash
+To: ajay
+Subject: Test Mail 1
+Hi, hw r u?
+
+Sub-Prompt-ajay>Done
+Server Response:
+User closed successfully.
+
+Main-Prompt>Quit
+Server Response:
+Closed Connection with the server.
+]0;bikash@bikash-HP: ~/cs3200/LAB4bikash@bikash-HP:~/cs3200/LAB4$ exit
+exit
+
+Script done on Sun 12 Feb 2017 10:53:01 AM IST

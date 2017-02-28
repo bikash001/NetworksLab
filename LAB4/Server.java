@@ -184,8 +184,10 @@ class EmailThread extends Thread {
                                 raf.seek(0);
 
                                 //temporary file
-                                File tempFile = new File(cmds[1]+".tmp");
-                                tempFile.createNewFile();
+                                File tempFile = new File("Spool/"+currUserName+".tmp");
+                                if (tempFile.createNewFile()){
+                                	System.out.println("created temp");
+                                }
 
                                 byte[] buf;
                                 FileOutputStream fs = new FileOutputStream(tempFile);
@@ -238,11 +240,10 @@ class EmailThread extends Thread {
                                     }
                                 }
                                 raf.close();
-                                
-                                currUserFile.delete();	// delete users spool file
                                 fs.close();
+                                currUserFile.delete();	// delete users spool file
+                                currUserFile = new File("Spool/"+currUserName+".dat");
                                 tempFile.renameTo(currUserFile); // rename temp file to user's spool file
-                                currUserFile = tempFile;
                                 raf = new RandomAccessFile(currUserFile,"r");
                                 raf.seek(pos); 	// set the file pointer
                     			out.writeUTF("Message Deleted\n");	// send the response
@@ -268,7 +269,7 @@ class EmailThread extends Thread {
                     		if (toFile.exists()) {
 
                     			// append the message at the end of the user's spool file
-                    			BufferedWriter tbr = new BufferedWriter(new FileWriter(toFile));
+                    			BufferedWriter tbr = new BufferedWriter(new FileWriter(toFile, true));
                     			tbr.append("From: "+currUserName+"\n");
                     			tbr.append("To: "+cmds[1]+"\n");
                     			while(!str.endsWith("###")) {

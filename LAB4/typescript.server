@@ -1,0 +1,9 @@
+Script started on Sun 12 Feb 2017 10:54:05 AM IST
+]0;bikash@bikash-HP: ~/cs3200/LAB4bikash@bikash-HP:~/cs3200/LAB4$ make
+javac Server.java
+javac Client.java
+]0;bikash@bikash-HP: ~/cs3200/LAB4bikash@bikash-HP:~/cs3200/LAB4$ java Server 1080
+^C]0;bikash@bikash-HP: ~/cs3200/LAB4bikash@bikash-HP:~/cs3200/LAB4$ exit
+exit
+
+Script done on Sun 12 Feb 2017 10:54:52 AM IST

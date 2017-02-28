@@ -1,0 +1,5 @@
+To compile run make.
+To run part1 enter ./part1 <inputfile> <outfile>
+To run part2 enter ./part2 <inputfile> <outfile>
+Self testing file 'input' is included.
+The corresponding output file for part1 and part2 are output.part1 and output.part2
