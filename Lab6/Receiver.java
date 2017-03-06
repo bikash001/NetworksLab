@@ -2,6 +2,7 @@ import java.net.DatagramSocket;
 import java.net.DatagramPacket;
 import java.util.Random;
 import java.lang.String;
+import java.lang.Thread;
 
 public class Receiver {
 
@@ -22,6 +23,7 @@ public class Receiver {
             		maxPkts = Integer.valueOf(args[++i]);
             	} else if (args[i].equals("-e")) {
             		perror = Double.valueOf(args[++i]);
+            		System.out.printf("perror %f\n",perror);
             	}
             }
 
@@ -34,17 +36,18 @@ public class Receiver {
                 for (int count=0; count < maxPkts;) {
                     DatagramPacket dp = new DatagramPacket(buf,1024);
                     ds.receive(dp);
-                    if (rgen.nextDouble() <= perror) {
-                    	continue;
-                    }
                     
                     // String str = new String(dp.getData(),0,dp.getLength());
                     // System.out.println("Received: "+str);
                     int seq = 0;
 					seq = buf[0];
-					seq = (seq << 8) + buf[1];
-					seq += (seq << 8) + buf[2];
-					seq += (seq << 8) + buf[3];
+					seq = (seq << 8) | buf[1];
+					seq += (seq << 8) | buf[2];
+					seq += (seq << 8) | buf[3];
+					if (rgen.nextDouble() <= perror) {
+                    	System.out.printf("packet %d dropped\n",seq);
+                    	continue;
+                    }
 					// System.out.printf("%x",buf[0]);
 					// System.out.printf("%x",buf[1]);
 					// System.out.printf("%x",buf[2]);
@@ -56,11 +59,12 @@ public class Receiver {
 
                     if (seq == NFE) {
                     	NFE++;
+                    	System.out.printf("received successfully %d\n",seq);
                     }
                     if (NFE == Integer.MAX_VALUE) {
                     	NFE = 0;
                     }
-                    String result = "ACK "+NFE;
+                    // String result = "ACK "+NFE;
                     byte[] arr = new byte[1024];
                     arr[0] = (byte)(NFE >> 24);
 					arr[1] = (byte)(NFE >> 16);
@@ -71,6 +75,7 @@ public class Receiver {
 					// System.out.printf("%x",arr[2]);
 					// System.out.printf("%x",arr[3]);
 					// System.out.println("");
+					Thread.sleep(2);
                     DatagramPacket dpSend = new DatagramPacket(arr,arr.length,dp.getSocketAddress());
                     ds.send(dpSend);
                     ++count;

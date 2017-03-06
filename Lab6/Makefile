@@ -1,10 +1,10 @@
-all: UdpServer.class UdpClient.class
+all: Sender.class Receiver.class
 
-UdpClient.class: UdpClient.java
-	javac UdpClient.java
+Receiver.class: Receiver.java
+	javac Receiver.java
 
-UdpServer.class: UdpServer.java
-	javac UdpServer.java
+Sender.class: Sender.java
+	javac Sender.java
 	
 clean:
 	rm *.class
