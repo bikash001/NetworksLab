@@ -7,13 +7,16 @@ import java.util.Timer;
 import java.util.HashMap;
 import java.lang.System;
 import java.util.Iterator;
+import java.lang.Math;
+import java.nio.ByteBuffer;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Sender {
 	public static  int toAck = 0;
 	public static int pktNo = 0;
 	public static ConcurrentHashMap<Integer,Timeout> timerList;
 	public static ConcurrentHashMap<Integer,Integer> resends;
-	public static long rtt = 0;
+	public static volatile double rtt = 0;
 	public static long totalAcked = 0;
 	public static int maxPkts = 100;
 	public static DatagramSocket ds = null;
@@ -24,6 +27,7 @@ public class Sender {
 	public static boolean debug = false;
 	public static long startTime;
 	public static Recv receiver = null;
+	private static final ReentrantLock lock = new ReentrantLock();
 	    
   	public static void main(String[] args) {
 	    int port = 1080;
@@ -35,7 +39,7 @@ public class Sender {
 		    for (int i=0; i<args.length; ++i) {
 		    	if (args[i].equals("-d")) {
 		    		debug = true;
-		    		System.out.println("debug Mode");
+		    		// System.out.println("debug Mode");
 		    	} else if (args[i].equals("-s")) {
 		    		ip = InetAddress.getByName(args[++i]);
 		    	} else if (args[i].equals("-p")) {
@@ -44,7 +48,6 @@ public class Sender {
 		    		pktLen = Integer.valueOf(args[++i]);
 		    	} else if (args[i].equals("-r")) {
 		    		pktGenRate = Integer.valueOf(args[++i]);
-		    		System.out.printf("gen rate: %d\n",pktGenRate);
 		    	} else if (args[i].equals("-n")) {
 		    		maxPkts = Integer.valueOf(args[++i]);
 		    	} else if (args[i].equals("-w")) {
@@ -54,13 +57,15 @@ public class Sender {
 		    	}
 		    }
 		} catch (Exception e) {
-			e.printStackTrace();
+			// e.printStackTrace();
 		}
+		// HashMap<Integer,byte[]> queBuffer = new HashMap<Integer,byte[]>();
 		ConcurrentHashMap<Integer,byte[]> queBuffer = new ConcurrentHashMap<Integer,byte[]>();
 	    timer = new Timer();
 	    resends = new ConcurrentHashMap<Integer,Integer>();
 	    PacketGen generator = new PacketGen(queBuffer, pktLen, maxBuffSize);
-	    timer.schedule(generator,0,1000/pktGenRate);
+	    Timer genTimer = new Timer();
+	    genTimer.schedule(generator,0,1000/pktGenRate);
 	   	
 	    try {
 			ds = new DatagramSocket();
@@ -70,14 +75,14 @@ public class Sender {
 			receiver.start();
 	    	
 	    	for (; pktNo < 10; ) {
-	        	if (queBuffer.containsKey(pktNo) && (pktNo-toAck+1) < wsize) {
+	    		getLock();
+	        	if (queBuffer.containsKey(pktNo) && (pktNo-toAck) < wsize) {
 	        		buff = queBuffer.get(pktNo);
 		        	DatagramPacket dpSend = new DatagramPacket(buff,buff.length,ip,port);
 		        	ds.send(dpSend);
 		        	Timeout tout = new Timeout(timerList, pktNo, resends,dpSend);
 		        	timerList.put(pktNo,tout);
 		        	timer.schedule(tout, 100);
-		        	// System.out.println(buff);
 		        	resends.put(pktNo, 0);
 		        	if (pktNo == Integer.MAX_VALUE) {
 		        		pktNo = 0;
@@ -86,34 +91,42 @@ public class Sender {
 		        	}
 		        	totalTrans++;
 		        }
+		        releaseLock();
 			}
 			while (totalAcked < maxPkts) {
-				// System.out.println("max less");
-				if (queBuffer.containsKey(pktNo) && pktNo-toAck+1 < wsize) {
-					// System.out.println("hello");
+				getLock();
+				if (queBuffer.containsKey(pktNo) && pktNo-toAck < wsize) {
 					buff = queBuffer.get(pktNo);
 		        	DatagramPacket dpSend = new DatagramPacket(buff,buff.length,ip,port);
 		        	ds.send(dpSend);
 		        	Timeout tout = new Timeout(timerList, pktNo, resends, dpSend);
 		        	timerList.put(pktNo,tout);
-		        	// if (rtt == 0) {
-		        	// 	rtt = 2;
-		        	// }
-		        	// System.out.printf("rtt---> %d\n",rtt);
-		        	timer.schedule(tout, 2 * rtt);
+		        	timer.schedule(tout, Math.max((long)(2 * rtt),2));
 		        	resends.put(pktNo,0);
+		        	System.out.println("sent "+pktNo);
 		        	if (pktNo == Integer.MAX_VALUE) {
 		        		pktNo = 0;
 		        	} else {
 		        		pktNo++;
 		        	}
 		        	totalTrans++;
+				} else {
+					// System.out.printf("length %d\n",queBuffer.size());
 				}
+				releaseLock();
 			}
 	      
 	    } catch(Exception e){
-	    	e.printStackTrace();
+	    	// e.printStackTrace();
 	    }
+	}
+
+	public static void getLock() {
+		lock.lock();
+	}
+
+	public static void releaseLock() {
+		lock.unlock();
 	}
 
 	public static void finalStatus() {
@@ -121,8 +134,8 @@ public class Sender {
 		receiver.stop();
 		System.out.printf("Packet Generation Rate: %d\n", pktGenRate);
 		System.out.printf("Packet Length: %d\n", pktLen);
-		System.out.printf("Retransmission Ration: %f\n", (float)totalTrans/totalAcked);
-		System.out.printf("Average RTT: %d ms\n", rtt);
+		System.out.printf("Retransmission Ratio: %f\n", (float)totalTrans/totalAcked);
+		System.out.printf("Average RTT: %f ms\n", rtt);
 	}
 }
 
@@ -130,8 +143,8 @@ class Recv extends Thread {
 	private DatagramSocket ds;
 	private ConcurrentHashMap<Integer,Timeout> tasks;
 	private ConcurrentHashMap<Integer,Integer> resends;
-	// private ConcurrentLinkedQueue<byte[]> queBuffer;
 	private ConcurrentHashMap<Integer,byte[]> queBuffer;
+	// private HashMap<Integer,byte[]> queBuffer;
 	public Recv(DatagramSocket soc, ConcurrentHashMap<Integer,Timeout> ts,ConcurrentHashMap<Integer,Integer> rs, ConcurrentHashMap<Integer,byte[]> buf) {
 		ds = soc;
 		tasks = ts;
@@ -140,64 +153,58 @@ class Recv extends Thread {
 	}
 
 	public void run() {
-		if (Sender.debug == true) {
-			System.out.println("yes debug");
-		} else {
-			System.out.println("no debug");
-		}
 		byte[] buff = new byte[1024];
 		long timediff;
 		long totalPktAcked = 0;
 		int value;
-		long localRtt;
+		double localRtt;
 		try {
 			while (true) {
 				DatagramPacket dpRecv = new DatagramPacket(buff,1024); 
 				ds.receive(dpRecv);
 				int seq = 0;
-				seq = buff[0];
-				seq = (seq << 8) | buff[1];
-				seq += (seq << 8) | buff[2];
-				seq += (seq << 8) | buff[3];
-				// System.out.printf("%x",buff[0]);
-				// System.out.printf("%x",buff[1]);
-				// System.out.printf("%x",buff[2]);
-				// System.out.printf("%x",buff[3]);
-				System.out.printf("\nreceived %d\n", seq);
+				ByteBuffer bb = ByteBuffer.wrap(buff);
+                seq = bb.getInt();
 				value = seq - 1;
 				if (Sender.debug) {
+					Sender.getLock();
 					if (tasks.containsKey(value)) {
-						// System.out.println("test1");
-						timediff = tasks.get(value).getRtt();
-						localRtt = ((Sender.rtt * totalPktAcked) + timediff) / (totalPktAcked + 1);
-						// System.out.printf("rttMod: %d\n", localRtt);
+						Timeout tt = tasks.get(value);
+						timediff = tt.getRtt();
+						double avg = (Sender.rtt * totalPktAcked) + timediff;
+						localRtt =  (avg / (totalPktAcked + 1));
 						Sender.rtt = localRtt;
-						System.out.printf("%d:\t Time Generated: %d:00 RTT: %d ms\t Number of Attempts: %d\n",value,tasks.get(value).genTime(),timediff,resends.get(value)+1);
+						try {
+							System.out.printf("%d:\t Time Generated: %d:00 RTT: %d ms\t Number of Attempts: %d\n",value,tt.genTime(),timediff,resends.get(value)+1);
+						} catch(Exception eee) {}
 						totalPktAcked++;
 						tasks.remove(value);
 						resends.remove(value);
 						queBuffer.remove(value);
 						Sender.totalAcked++;
 					}
-					// Sender.totalAcked++;
-					// Sender.toAck++;
+					Sender.releaseLock();
 				}
 
-				for (int j = Sender.toAck; j < value; j++) {
+				for (int j = Sender.toAck; j <= value; j++) {
+					Sender.getLock();
 					if (tasks.containsKey(j)) {
-						System.out.println("test2");
 						timediff = tasks.get(j).getRtt();
-						Sender.rtt = ((Sender.rtt * totalPktAcked) + timediff) / (totalPktAcked + 1);
+						double avg = (Sender.rtt * totalPktAcked) + timediff;
+						localRtt =  (avg / (totalPktAcked + 1));
+						Sender.rtt = localRtt;
 						totalPktAcked++;
 						tasks.remove(j);
 						resends.remove(j);
 						queBuffer.remove(j);
 						Sender.totalAcked++;
 					}
+					Sender.releaseLock();
 				}
-				Sender.toAck = seq + 1;
+				Sender.toAck = seq;
 				if (totalPktAcked >= Sender.maxPkts) {
 					Sender.finalStatus();
+					// System.out.println("max acked");
 					System.exit(0);
 				}
 			}
@@ -208,8 +215,8 @@ class Recv extends Thread {
 }
 
 class PacketGen extends TimerTask {
-	// private ConcurrentLinkedQueue<byte[]> queBuffer;
 	private ConcurrentHashMap<Integer,byte[]> queBuffer;
+	// private HashMap<Integer,byte[]> queBuffer;
 	private Random rand;
 	private int length;
 	private int seqNo = 0;
@@ -223,6 +230,7 @@ class PacketGen extends TimerTask {
 
 	@Override
 	public void run() {
+		Sender.getLock();
 		if (queBuffer.size() < buffSize) {
 			byte[] arr = new byte[length];
 			rand.nextBytes(arr);
@@ -231,13 +239,13 @@ class PacketGen extends TimerTask {
 			arr[2] = (byte)(seqNo >> 8);
 			arr[3] = (byte)(seqNo);
 			queBuffer.put(seqNo, arr);
-			// System.out.println("inside-gen "+seqNo);
 			if (seqNo == Integer.MAX_VALUE) {
 				seqNo = 0;
 			} else {
 				++seqNo;
 			}
 		}
+		Sender.releaseLock();
 	}
 }
 
@@ -257,15 +265,22 @@ class Timeout extends TimerTask {
 
 	@Override
 	public void run() {
-		System.out.println("timeout -------- "+seq);
-		for (int i=seq; i <= Sender.pktNo; ++i) {
-			if (tasks.containsKey(i)) {
-				tasks.get(i).resend();
+		// Sender.timer.cancel();
+		// Sender.timer = new Timer();
+		// System.out.println("timeout -------- "+seq);
+		// if (seq < Sender.toAck) {
+		// 	this.cancel();
+		// 	// // System.out.println("prev rem "+Sender.toAck);
+		// 	tasks.remove(seq);
+		// 	resends.remove(seq);
+		// } else {
+		// 	// System.out.println("not removing "+Sender.toAck);
+			for (int i=seq; i <= Sender.pktNo; ++i) {
+				if (tasks.containsKey(i)) {
+					tasks.get(i).resend();
+				}
 			}
-			//  else {
-			// 	System.out.println(tasks);
-			// }
-		}
+		// }
 	}
 
 	public void resend() {
@@ -275,6 +290,7 @@ class Timeout extends TimerTask {
 			Integer val = resends.get(seq);
 			if (val >= 5) {
 				Sender.finalStatus();
+				// System.out.println("more than 5  "+seq);
 				System.exit(0);
 			}
 			val++;
@@ -284,10 +300,10 @@ class Timeout extends TimerTask {
 				e.printStackTrace();
 			}
 			Timeout ts = new Timeout(tasks,seq,resends,dp); 
-			Sender.timer.schedule(ts,Sender.rtt * 2);
+			Sender.timer.schedule(ts,Math.max((long)(Sender.rtt * 2),2));
 			tasks.put(seq,ts);
 			Sender.totalTrans++;
-			System.out.printf("resending--> %d\n",seq);
+			// System.out.printf("resending--> %d\n",seq);
 			resends.replace(seq,resends.get(seq)+1);
 		}
 	}
