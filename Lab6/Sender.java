@@ -28,6 +28,7 @@ public class Sender {
 	public static long startTime;
 	public static Recv receiver = null;
 	private static final ReentrantLock lock = new ReentrantLock();
+	private static final ReentrantLock timerlock = new ReentrantLock();
 	    
   	public static void main(String[] args) {
 	    int port = 1080;
@@ -103,7 +104,6 @@ public class Sender {
 		        	timerList.put(pktNo,tout);
 		        	timer.schedule(tout, Math.max((long)(2 * rtt),2));
 		        	resends.put(pktNo,0);
-		        	System.out.println("sent "+pktNo);
 		        	if (pktNo == Integer.MAX_VALUE) {
 		        		pktNo = 0;
 		        	} else {
@@ -119,6 +119,14 @@ public class Sender {
 	    } catch(Exception e){
 	    	// e.printStackTrace();
 	    }
+	}
+
+	public static void getTimerLock() {
+		timerlock.lock();
+	}
+
+	public static void releaseTimerLock() {
+		timerlock.unlock();
 	}
 
 	public static void getLock() {
@@ -160,7 +168,7 @@ class Recv extends Thread {
 		double localRtt;
 		try {
 			while (true) {
-				DatagramPacket dpRecv = new DatagramPacket(buff,1024); 
+				DatagramPacket dpRecv = new DatagramPacket(buff,1024);
 				ds.receive(dpRecv);
 				int seq = 0;
 				ByteBuffer bb = ByteBuffer.wrap(buff);
@@ -168,6 +176,7 @@ class Recv extends Thread {
 				value = seq - 1;
 				if (Sender.debug) {
 					Sender.getLock();
+					Sender.getTimerLock();
 					if (tasks.containsKey(value)) {
 						Timeout tt = tasks.get(value);
 						timediff = tt.getRtt();
@@ -183,10 +192,12 @@ class Recv extends Thread {
 						queBuffer.remove(value);
 						Sender.totalAcked++;
 					}
+					Sender.releaseTimerLock();
 					Sender.releaseLock();
 				}
 
 				for (int j = Sender.toAck; j <= value; j++) {
+					Sender.getTimerLock();
 					Sender.getLock();
 					if (tasks.containsKey(j)) {
 						timediff = tasks.get(j).getRtt();
@@ -199,6 +210,7 @@ class Recv extends Thread {
 						queBuffer.remove(j);
 						Sender.totalAcked++;
 					}
+					Sender.releaseTimerLock();
 					Sender.releaseLock();
 				}
 				Sender.toAck = seq;
@@ -276,9 +288,11 @@ class Timeout extends TimerTask {
 		// } else {
 		// 	// System.out.println("not removing "+Sender.toAck);
 			for (int i=seq; i <= Sender.pktNo; ++i) {
+				Sender.getTimerLock();
 				if (tasks.containsKey(i)) {
 					tasks.get(i).resend();
 				}
+				Sender.releaseTimerLock();
 			}
 		// }
 	}
