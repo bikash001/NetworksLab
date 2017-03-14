@@ -49,34 +49,17 @@ class User {
 		totalPktSent = 0;
 		totalSlotUsed = 0;
 	}
-	public int get() {
-		return counter;
-	}
-	public User set(int k) {
-		counter = k;
-		return this;
-	}
-	public User inc() {
-		counter++;
-		return this;
-	}
-	public User dec() {
-		counter--;
-		return this;
-	}
-	public boolean zero() {
-		return counter == 0;
-	}
 	public int getId() {
 		return userId;
 	}
 	public boolean sentUnsuccess() {
 		if (pkts <= 2 && pkts > 0) {
-			totalSlotUsed++;
+			totalSlotUsed += pkts;
 			if (counter == 0) {
-				wsize = (int)(Math.min(265, wsize*2));
 				counter = gen.nextInt(wsize);
-				if (retransmit > 10) {
+				wsize = (int)(Math.min(265, wsize*2));
+				// System.out.println("wsizeInc "+wsize+", cnt= "+counter);
+				if (retransmit > 100) {
 					return true;
 				}
 			}
@@ -84,14 +67,18 @@ class User {
 		return false;
 	}
 	public void sentSuccess() {
-		pkts--;
 		wsize = (int)(Math.max(2,wsize * 0.75));
+		// System.out.println("wsizeDec "+wsize);
 		retransmit = 0;
 		resend = false;
-		totalSlotUsed++;
+		totalSlotUsed += pkts;
+		pkts--;
 		totalPktSent++;
 	}
 	public boolean sendPkt() {
+		if (counter > 0) {
+			counter--;
+		}
 		if (counter == 0) {
 			if (resend) {
 				retransmit++;
@@ -102,16 +89,12 @@ class User {
 			} else {
 				return false;
 			}
-		} else {
-			counter--;
-			return false;
 		}
+		return false;
 	}
 	public User genPkt() {
-		if (gen.nextDouble() <= pktGenRate) {
-			if (pkts < 2){
-				pkts++;
-			}
+		if (gen.nextDouble() <= pktGenRate && pkts < 2) {
+			pkts++;
 		}
 		return this;
 	}
@@ -145,10 +128,10 @@ class Aloha {
 			totalPktSent += users.get(i).pktSent();
 			totalSlotUsed += users.get(i).slotUsed();
 		}
-		System.out.printf("%d, %d\n", totalPktSent, slotCount);
+		// System.out.printf("%d, %d\n", totalPktSent, slotCount);
 		double avg = (double)totalSlotUsed / totalPktSent;
 		double thpt = (double)totalPktSent / slotCount;
-		System.out.printf("%d, %d, %f, %f, %f\n", totalUser, windowSize, pktGenRate, thpt, avg);
+		System.out.printf("%d %d %f %f %f\n", totalUser, windowSize, pktGenRate, thpt, avg);
 	}
 
 	public void start() {
@@ -161,6 +144,7 @@ class Aloha {
 
 		int counter=0;
 		int simTime;
+		
 		for (simTime=0; simTime < maxPkts; slotCount++) {
 			counter++;
 			totalTransmits = 0;
@@ -179,7 +163,7 @@ class Aloha {
 				for (int i=0; i<totalUser; i++) {
 					if (i != userNo) {
 						if (users.get(i).sentUnsuccess()) {
-							System.out.println("lol");
+							// System.out.println("lol");
 							stats();
 							return;
 						}
@@ -188,7 +172,7 @@ class Aloha {
 			} else {
 				for (int i=0; i<totalUser; i++) {
 					if (users.get(i).sentUnsuccess()) {
-						System.out.println("lol");
+						// System.out.println("lol");
 						stats();
 						return;
 					}
