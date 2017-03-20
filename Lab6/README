@@ -1,0 +1,4 @@
+1) To compile enter the command, make
+2) To run the Receiver, enter  java Receiver [args]
+3) To run the Sender, enter java Sender [args]
+4) First 4 byte of the packet is used for sequence number

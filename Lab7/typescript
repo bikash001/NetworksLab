@@ -1,0 +1,11 @@
+Script started on Sat 18 Mar 2017 05:18:55 PM IST
+]0;bikash@bikash-HP: ~/cs3200/Lab7bikash@bikash-HP:~/cs3200/Lab7$ make
+javac Main.java
+]0;bikash@bikash-HP: ~/cs3200/Lab7bikash@bikash-HP:~/cs3200/Lab7$ java Main -W 2 -p 0.01 -N 50 -M 100000
+50 2 0.010000 0.340315 122.869640
+]0;bikash@bikash-HP: ~/cs3200/Lab7bikash@bikash-HP:~/cs3200/Lab7$ java Main -@[KW 4 -p 0.02 -N 100 -M 100000
+100 4 0.020000 0.373230 465.137110
+]0;bikash@bikash-HP: ~/cs3200/Lab7bikash@bikash-HP:~/cs3200/Lab7$ exit
+exit
+
+Script done on Sat 18 Mar 2017 05:20:29 PM IST

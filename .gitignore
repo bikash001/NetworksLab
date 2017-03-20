@@ -2,3 +2,4 @@
 *.class
 *.tar.gz
 *.dat
+report/*

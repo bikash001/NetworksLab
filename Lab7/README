@@ -1,0 +1,7 @@
+1) To compile the program, run make
+2) To execute the program, run java Main <arguments>
+	e.g.- java Main -W 2 -p 0.02 -N 50 -M 10000
+3) To generate the graph for given probabilities, run python report.py
+4) report.py executes the program for the given probabilities and plots the result.
+5) program prints the status in the following order
+	Total-node Window-size Packet-generation-rate Throughput Average-packet-delay

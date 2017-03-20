@@ -3,7 +3,6 @@ import java.net.DatagramPacket;
 import java.util.Random;
 import java.lang.String;
 import java.lang.Thread;
-import java.nio.ByteBuffer;
 
 public class Receiver {
 
@@ -39,19 +38,21 @@ public class Receiver {
                     ds.receive(dp);
                     
                     int seq = 0;
-                    ByteBuffer bb = ByteBuffer.wrap(buf);
-                    seq = bb.getInt();
+					seq = buf[0];
+					seq = (seq << 8) | buf[1];
+					seq += (seq << 8) | buf[2];
+					seq += (seq << 8) | buf[3];
 					if (rgen.nextDouble() <= perror) {
                     	// System.out.printf("packet %d dropped\n",seq);
                     	continue;
                     }
 					// System.out.printf("\nrecieved %d\n", seq);
+					if (debugMode) {
+						System.out.printf("%d:\t Time Received: %d:00  Packet droped: false\n",seq,System.currentTimeMillis()-startTime);
+					}
 
                     if (seq == NFE) {
                     	NFE++;
-                    	if (debugMode) {
-							System.out.printf("%d:\t Time Received: %d:00  Packet droped: false\n",seq,System.currentTimeMillis()-startTime);
-						}
                     	// System.out.printf("received successfully %d\n",seq);
                     }
                     if (NFE == Integer.MAX_VALUE) {

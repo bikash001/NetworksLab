@@ -1,0 +1,4 @@
+Packet Generation Rate: 1000
+Packet Length: 128
+Retransmission Ratio: Infinity
+Average RTT: 0 ms

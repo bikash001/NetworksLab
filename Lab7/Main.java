@@ -163,7 +163,6 @@ class Aloha {
 				for (int i=0; i<totalUser; i++) {
 					if (i != userNo) {
 						if (users.get(i).sentUnsuccess()) {
-							// System.out.println("lol");
 							stats();
 							return;
 						}
@@ -172,7 +171,6 @@ class Aloha {
 			} else {
 				for (int i=0; i<totalUser; i++) {
 					if (users.get(i).sentUnsuccess()) {
-						// System.out.println("lol");
 						stats();
 						return;
 					}

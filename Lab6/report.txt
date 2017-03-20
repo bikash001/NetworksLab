@@ -1,0 +1,42 @@
+perror = 0.0001
+Packet Generation Rate: 1000
+Packet Length: 128
+Retransmission Ratio: 1.105919
+Average RTT: 0.417445 ms
+
+perror = 0.0001
+Packet Generation Rate: 1000
+Packet Length: 1024
+Retransmission Ratio: 1.133625
+Average RTT: 0.566265 ms
+
+perror = 0.0000001
+Packet Generation Rate: 1000
+Packet Length: 128
+Retransmission Ratio: 1.082723
+Average RTT: 0.380105 ms
+
+perror = 0.0000001
+Packet Generation Rate: 1000
+Packet Length: 1024
+Retransmission Ratio: 1.096912
+Average RTT: 0.358892 ms
+
+
+perror = 0.001
+Packet Generation Rate: 1000
+Packet Length: 128
+Retransmission Ratio: 1.069072
+Average RTT: 0.406186 ms
+
+perror = 0.01
+Packet Generation Rate: 1000
+Packet Length: 128
+Retransmission Ratio: 1.132096
+Average RTT: 0.374454 ms
+
+perror = 0.1
+Packet Generation Rate: 1000
+Packet Length: 128
+Retransmission Ratio: 2.191489
+Average RTT: 1.991489 ms
