@@ -38,10 +38,10 @@ public class Receiver {
                     ds.receive(dp);
                     
                     int seq = 0;
-					seq = buf[0];
-					seq = (seq << 8) | buf[1];
-					seq += (seq << 8) | buf[2];
-					seq += (seq << 8) | buf[3];
+					seq = (0xff & buf[0]);
+					seq = (seq << 8) | (0xff & buf[1]);
+					seq = (seq << 8) | (0xff & buf[2]);
+					seq = (seq << 8) | (0xff & buf[3]);
 					if (rgen.nextDouble() <= perror) {
                     	// System.out.printf("packet %d dropped\n",seq);
                     	continue;

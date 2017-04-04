@@ -14,7 +14,7 @@ public class Sender {
 	public static int pktNo = 0;
 	public static ConcurrentHashMap<Integer,Timeout> timerList;
 	public static ConcurrentHashMap<Integer,Integer> resends;
-	public static long rtt = 0;
+	public static double rtt = 1.0;
 	public static long totalAcked = 0;
 	public static int maxPkts = 100;
 	public static DatagramSocket ds = null;
@@ -87,6 +87,7 @@ public class Sender {
 		        	totalTrans++;
 		        }
 			}
+			
 			while (totalAcked < maxPkts) {
 				if (queBuffer.containsKey(pktNo) && pktNo-toAck < wsize) {
 					buff = queBuffer.get(pktNo);
@@ -94,7 +95,7 @@ public class Sender {
 		        	ds.send(dpSend);
 		        	Timeout tout = new Timeout(timerList, pktNo, resends, dpSend);
 		        	timerList.put(pktNo,tout);
-		        	timer.schedule(tout, 2 * rtt);
+		        	timer.schedule(tout, (long)(2 * rtt));
 		        	resends.put(pktNo,0);
 		        	if (pktNo == Integer.MAX_VALUE) {
 		        		pktNo = 0;
@@ -116,7 +117,7 @@ public class Sender {
 		System.out.printf("Packet Generation Rate: %d\n", pktGenRate);
 		System.out.printf("Packet Length: %d\n", pktLen);
 		System.out.printf("Retransmission Ratio: %f\n", (float)totalTrans/totalAcked);
-		System.out.printf("Average RTT: %d ms\n", rtt);
+		System.out.printf("Average RTT: %f ms\n", rtt);
 	}
 }
 
@@ -137,25 +138,30 @@ class Recv extends Thread {
 		long timediff;
 		long totalPktAcked = 0;
 		int value;
-		long localRtt;
+		double localRtt;
 		try {
 			while (true) {
 				DatagramPacket dpRecv = new DatagramPacket(buff,1024); 
 				ds.receive(dpRecv);
 				int seq = 0;
-				seq = buff[0];
-				seq = (seq << 8) | buff[1];
-				seq += (seq << 8) | buff[2];
-				seq += (seq << 8) | buff[3];
+				seq = (0xff & buff[0]);
+				seq = (seq << 8) | (0xff & buff[1]);
+				seq = (seq << 8) | (0xff & buff[2]);
+				seq = (seq << 8) | (0xff & buff[3]);
 				// System.out.printf("\nreceived %d\n", seq);
 				value = seq - 1;
 				if (Sender.debug) {
 					if (tasks.containsKey(value)) {
-						timediff = tasks.get(value).getRtt();
+						Timeout mtask = tasks.get(value);
+						timediff = mtask.getRtt();
+						long gentime = mtask.genTime();
 						double avg = (Sender.rtt * totalPktAcked) + timediff;
-						localRtt =  (long)Math.ceil(avg / (totalPktAcked + 1));
+						localRtt =  avg / (totalPktAcked + 1);
 						Sender.rtt = localRtt;
-						System.out.printf("%d:\t Time Generated: %d:00 RTT: %d ms\t Number of Attempts: %d\n",value,tasks.get(value).genTime(),timediff,resends.get(value)+1);
+						Integer attempts = resends.get(value);
+						if (attempts != null) {
+							System.out.printf("%d:\t Time Generated: %d:00 RTT: %d ms\t Number of Attempts: %d\n",value,gentime,timediff,attempts+1);
+						}
 						totalPktAcked++;
 						tasks.remove(value);
 						resends.remove(value);
@@ -168,7 +174,7 @@ class Recv extends Thread {
 					if (tasks.containsKey(j)) {
 						timediff = tasks.get(j).getRtt();
 						double avg = (Sender.rtt * totalPktAcked) + timediff;
-						localRtt =  (long)Math.ceil(avg / (totalPktAcked + 1));
+						localRtt =  avg / (totalPktAcked + 1);
 						Sender.rtt = localRtt;
 						totalPktAcked++;
 						tasks.remove(j);
@@ -212,6 +218,7 @@ class PacketGen extends TimerTask {
 			arr[1] = (byte)(seqNo >> 16);
 			arr[2] = (byte)(seqNo >> 8);
 			arr[3] = (byte)(seqNo);
+
 			queBuffer.put(seqNo, arr);
 			if (seqNo == Integer.MAX_VALUE) {
 				seqNo = 0;
@@ -234,6 +241,14 @@ class Timeout extends TimerTask {
 		resends = rs;
 		dp = ds;
 		sendTime = System.currentTimeMillis();
+	}
+
+	public Timeout(ConcurrentHashMap<Integer,Timeout> timerList, int sn, ConcurrentHashMap<Integer,Integer> rs, DatagramPacket ds, long stime) {
+		tasks = timerList;
+		seq = sn;
+		resends = rs;
+		dp = ds;
+		sendTime = stime;
 	}
 
 	@Override
@@ -270,8 +285,8 @@ class Timeout extends TimerTask {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			Timeout ts = new Timeout(tasks,seq,resends,dp); 
-			Sender.timer.schedule(ts,Sender.rtt * 2);
+			Timeout ts = new Timeout(tasks,seq,resends,dp,sendTime); 
+			Sender.timer.schedule(ts,(long)(Sender.rtt * 2));
 			tasks.put(seq,ts);
 			Sender.totalTrans++;
 			// System.out.printf("resending--> %d\n",seq);
