@@ -1,0 +1,5 @@
+1) To compile the program, run make
+2) To execute the program, run java Main [arguments]
+	Example:- java Main -i 1 -m 1 -n 1 -f 0.1 -s 0.01 -T 500 -o output_file
+3) report.py file plots the result for all the combinations of values given in the problem statement.
+4) To plot the graphs, run python report.py

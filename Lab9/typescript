@@ -1,0 +1,8 @@
+Script started on Saturday 08 April 2017 10:20:58 PM IST
+]0;bikash@bikash-HP: ~/cs3200/Lab9[01;32mbikash@bikash-HP[00m:[01;34m~/cs3200/Lab9[00m$ make
+javac Main.java
+]0;bikash@bikash-HP: ~/cs3200/Lab9[01;32mbikash@bikash-HP[00m:[01;34m~/cs3200/Lab9[00m$ java Main -i 1 -m 1 -n 1 -f 0.1 -s 0.01 -T 500 -o output_file
+]0;bikash@bikash-HP: ~/cs3200/Lab9[01;32mbikash@bikash-HP[00m:[01;34m~/cs3200/Lab9[00m$ exit
+exit
+
+Script done on Saturday 08 April 2017 10:22:15 PM IST
