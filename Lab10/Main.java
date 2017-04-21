@@ -9,6 +9,10 @@ import java.util.ArrayList;
 import java.net.InetSocketAddress;
 import java.util.Random;
 import java.util.Iterator;
+import java.io.FileWriter;
+import java.util.Comparator;
+import java.util.PriorityQueue;
+import java.util.Arrays;
 
 public class Main {
 	public static void main(String[] args) {
@@ -16,6 +20,8 @@ public class Main {
 		for (int i=0; i<args.length; i += 2) {
 			hmap.put(args[i], args[i+1]);
 		}
+		Router rt = new Router(hmap);
+		rt.route();
 	}
 
 	public static int fillBytes(byte[] buf, int start, int num) {
@@ -57,7 +63,7 @@ class Router {
 		}
 		try {
 			id = Integer.valueOf(hm.get("-i"));
-			inFileName = hm.get("-i");
+			inFileName = hm.get("-f");
 			outFileName = hm.get("-o");
 			if (inFileName == null || outFileName == null) {
 				System.out.println("Error: Invalid input.");
@@ -70,7 +76,6 @@ class Router {
 	}
 
 	public void route() {
-		helloInt *= 1000;
 		int nodes, links;
 		BufferedReader br = null;
 		HashMap<Integer,Pair<Integer,Integer>> map = new HashMap<Integer,Pair<Integer,Integer>>();
@@ -111,9 +116,16 @@ class Router {
 			System.exit(0);
 		}
 
+		HashMap<Integer,byte[]> lsa = new HashMap<Integer,byte[]>();
 		HelloSender sender = new HelloSender(neighbors,ds,helloInt,id,map);
-		byte[] buffer = new byte[neighbors.size()*4+13];
-		HashMap<Integer,Integer> last_lsa = new HashMap<Integer,Integer>();
+		LSA lsaSender = new LSA(ds, costs, neighbors, id, lsaInt);
+		Topology plot = new Topology(lsa, neighbors, id, spfInt, outFileName);
+		sender.start();
+		lsaSender.start();
+		plot.start();
+
+		byte[] buffer = new byte[1024];
+		HashMap<Integer,Integer> last_lsa = new HashMap<Integer,Integer>();	//stores counter for last lsa segment received
 		int size = neighbors.size();
 		for (int i=0; i<size; i++) {
 			last_lsa.put(neighbors.get(i), -1);
@@ -121,12 +133,11 @@ class Router {
 		//receiver
 		DatagramPacket dp, ds_rcv;
 		int length, sender_id, i, min, max;
-		HashMap<Integer,byte[]> lsa = new HashMap<Integer,byte[]>();
 		Random random = new Random();
 
 		try {
 			while (true) {
-				ds_rcv = new DatagramPacket(buffer, buffer.length);
+				ds_rcv = new DatagramPacket(buffer, 1024);
 				ds.receive(ds_rcv);
 				// String str = new String(ds_rcv.getData(),0,ds_rcv.getLength());
 				length = ds_rcv.getLength();
@@ -143,10 +154,10 @@ class Router {
 					Main.fillBytes(msg, i+8, min+random.nextInt(max-min+1));
 					dp = new DatagramPacket(msg,msg.length,new InetSocketAddress("localhost",10000+sender_id));
 					ds.send(dp);
-				} else if (buffer[0] == 0x1) {
+				} else if (buffer[0] == 0x1) {	//lsa message
 					int seqno = Main.getInt(buffer,5);
 					if (seqno > last_lsa.get(sender_id)) {
-						lsa.put(sender_id,buffer.clone());
+						lsa.put(sender_id,Arrays.copyOf(buffer,length));
 						for (int j=0; j<size; j++) {
 							if (neighbors.get(j) != sender_id) {
 								dp = new DatagramPacket(buffer,length,new InetSocketAddress("localhost",10000+neighbors.get(j)));
@@ -164,6 +175,7 @@ class Router {
 	}
 }
 
+//send lsa segments
 class LSA extends Thread {
 	private int interval;
 	private int seqNo;
@@ -187,25 +199,37 @@ class LSA extends Thread {
 		DatagramPacket dp;
 		entries = neighbors.size();
 		byte[] message = new byte[entries*4+13];
+		System.out.println("id: "+id+" main "+message.length);
+		int m_count = 0;
 
 		try {
 			while(true) {
+				m_count = 0;
 				message[0] = 0x1;	//lsa datagram
 				i = Main.fillBytes(message,1,id);//id
 				i = Main.fillBytes(message,i,seqNo);//sequence no.
 				i = Main.fillBytes(message,i,entries); //no. of entries
-				for (int j=0; j<entries; j++, i=i+8) {
-					Main.fillBytes(message,i,neighbors.get(j));//neighbour id
-					Main.fillBytes(message, i+4, costs.get(neighbors.get(j)));//cost
-				}
 				for (int j=0; j<entries; j++) {
-					dp = new DatagramPacket(message,message.length,new InetSocketAddress("localhost",10000+neighbors.get(i)));
+					if (costs.containsKey(neighbors.get(j))) {
+						Main.fillBytes(message,i,neighbors.get(j));//neighbour id
+						Main.fillBytes(message, i+4, costs.get(neighbors.get(j)));//cost
+						i += 8;
+						m_count++;
+					}
+				}
+				Main.fillBytes(message,9,m_count);
+				for (int j=0; j<entries; j++) {
+
+					System.out.println("id: "+id+" count "+m_count);
+					System.out.println("-- "+message.length);
+					dp = new DatagramPacket(message,13+m_count*8,new InetSocketAddress("localhost",10000+neighbors.get(j)));
 					ds.send(dp);
 				}
-				Thread.sleep(interval);
+				Thread.sleep(1000*interval);
 				seqNo++;
 			}
 		} catch (Exception e) {
+			System.out.println("lsa sender stopped");
 			e.printStackTrace();
 		}
 	}
@@ -240,9 +264,10 @@ class HelloSender extends Thread {
 					dp = new DatagramPacket(mbytes,mbytes.length,new InetSocketAddress("localhost",10000+neighbors.get(i)));
 					ds.send(dp);
 				}
-				Thread.sleep(sleepTime);
+				Thread.sleep(1000*sleepTime);
 			}
 		} catch (Exception e) {
+			System.out.println("Hello Sender stopped");
 			e.printStackTrace();
 		}
 	}
@@ -253,32 +278,39 @@ class Topology extends Thread {
 	private ArrayList<Integer> neighbors = null;
 	private HashMap<Integer,byte[]> lsas = null;
 	private int id;
+	private String outfile;
 
-	public Topology(HashMap<Integer,byte[]> hm, ArrayList<Integer> al, int mid, int time) {
+	public Topology(HashMap<Integer,byte[]> hm, ArrayList<Integer> al, int mid, int time, String file) {
 		neighbors = al;
 		lsas = hm;
 		id = mid;
 		interval = time;
+		outfile = file;
 	}
 
 	@Override
 	public void run() {
 		Node root = new Node(id,0);
-		while(true) {
-			Thread.sleep(interval);
-			createGraph(root);
+		try {
+			while(true) {
+				Thread.sleep(1000*interval);
+				createGraph(root);
+			}
+		} catch (Exception e) {
+			System.out.println("Topology generator stopped");
+			e.printStackTrace();
 		}
 	}
 
-	private void createGraph(root) {
+	private void createGraph(Node root) {
 		int size = lsas.size();
 		Integer temp_id;
-		PriorityQueue<Node> q = PriorityQueue<Node>(size, new NodeComparator());
-		HashMap<Integer,Node> list = new HashMap<Integer,Node>();
+		PriorityQueue<Node> q = new PriorityQueue<Node>(new NodeComparator());
+		HashMap<Integer,Node> list = new HashMap<Integer,Node>();	//list contains all the nodes
 		Node temp;
 
 		for (Iterator itr = lsas.keySet().iterator(); itr.hasNext(); ) {
-			temp_id = itr.next();
+			temp_id = (Integer)itr.next();
 			if (temp_id != id) {
 				temp = new Node(temp_id);
 				q.add(temp);
@@ -289,19 +321,22 @@ class Topology extends Thread {
 		list.put(id, temp);
 		byte[] succ;
 		int cost;
-		Node neigh;
+		Node neigh = null;
 		int sum;
 		while (temp != null) {
 			succ = lsas.get(temp.id);
-			for (int i=13; i<succ.length; i+=8) {
-				neigh = list.get(Main.getInt(i));
-				cost = Main.getInt(i+4);
-				sum = temp.cost + cost;
-				if (sum < neigh.cost) {
-					neigh.cost = sum;
-					neigh.parent = temp;
-					q.remove(neigh);
-					q.add(neigh);
+			if (succ != null) {
+				int entry_count = Main.getInt(succ,9);
+				for (int i=13, j=0; j<entry_count; j++, i+=8) {
+					neigh = list.get(Main.getInt(succ,i));	//array out of bound
+					cost = Main.getInt(succ,i+4);
+					sum = temp.cost + cost;
+					if (sum < neigh.cost) {
+						neigh.cost = sum;
+						neigh.parent = temp;
+						q.remove(neigh);
+						q.add(neigh);
+					}
 				}
 			}
 			temp = q.poll();
@@ -312,17 +347,41 @@ class Topology extends Thread {
 	private void printGraph(HashMap<Integer,Node> list) {
 		Node start = list.get(id);
 		Node temp, curr;
-		
-		for (Iterator itr = list.keySet().iterator(); itr.hasNext(); ) {
-			temp = itr.next();
-			curr = temp;
-			ArrayList<Integer> path = new ArrayList<Integer>();
+		FileWriter fw = null;
+		try {
+			fw = new FileWriter(outfile, true);
+			fw.write("Routing Table for Node No. "+id+" at Time "+(System.currentTimeMillis()/1000));
+			fw.write("\n");
+			fw.write("Destination\t Path\t Cost\n");
+			for (Iterator itr = list.keySet().iterator(); itr.hasNext(); ) {
+				temp = list.get(itr.next());
+				curr = temp;
+				ArrayList<Integer> path = new ArrayList<Integer>();
 
-			while(curr != start) {
-				path.add(0,curr.id);
-				curr = curr.parent;
+				while(curr != start && curr != null) {	//getting null pointer exception
+					path.add(0,curr.id);
+					curr = curr.parent;
+				}
+				if (path.size() > 0 && curr != null) {
+					fw.write(temp.id);
+					fw.write("\t");
+					Iterator ii = path.iterator();
+					fw.write((Integer)ii.next());
+					while(ii.hasNext()) {
+						fw.write("-"+ii.next());
+					}
+					fw.write("\t"+temp.cost+"\n");
+				}
 			}
-
+			fw.write("\n");
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				fw.close();
+			} catch (Exception ee) {
+				ee.printStackTrace();
+			}			
 		}
 	}
 }
