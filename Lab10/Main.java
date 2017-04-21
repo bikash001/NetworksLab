@@ -78,7 +78,7 @@ class Router {
 	}
 
 	public void route() {
-		int nodes, links;
+		int nodes = 0, links;
 		BufferedReader br = null;
 		HashMap<Integer,Pair<Integer,Integer>> map = new HashMap<Integer,Pair<Integer,Integer>>();
 		neighbors = new ArrayList<Integer>();
@@ -129,8 +129,8 @@ class Router {
 		byte[] buffer = new byte[1024];
 		HashMap<Integer,Integer> last_lsa = new HashMap<Integer,Integer>();	//stores counter for last lsa segment received
 		int size = neighbors.size();
-		for (int i=0; i<size; i++) {
-			last_lsa.put(neighbors.get(i), -1);
+		for (int i=0; i<nodes; i++) {
+			last_lsa.put(i, -1);
 		}
 		//receiver
 		DatagramPacket dp, ds_rcv;
@@ -299,7 +299,7 @@ class Topology extends Thread {
 	public void run() {
 		Node root = new Node(id,0);
 		try {
-			pw = new PrintWriter(outfile);
+			pw = new PrintWriter(outfile+"-"+id+".txt");
 			while(true) {
 				Thread.sleep(1000*interval);
 				createGraph(root);
@@ -327,34 +327,22 @@ class Topology extends Thread {
 		}
 		temp = new Node(id,0);
 		list.put(id, temp);
-		// if (lsas.get(temp.id) != null) {
-		// 	// System.out.println(lsas.get(temp.id));
-		// 	// System.out.println("not null");
-		// } else {
-		// 	// System.out.println("null");
-		// }
+		
 		byte[] succ;
 		int cost;
 		Node neigh = null;
 		int sum;
-		// int count = 0;
+
 		while (temp != null) {
 			succ = lsas.get(temp.id);
 			if (succ != null) {
-				// count++;
 
 				int entry_count = Main.getInt(succ,9);
 				for (int i=13, j=0; j<entry_count; j++, i+=8) {
-					try {
-						neigh = list.get(Main.getInt(succ,i));	//array out of bound
-					} catch (Exception e) {
-						e.printStackTrace();
-						System.out.printf("%d %d %d %d\n", entry_count, i, j, succ.length);
-						for (int k=0; k<succ.length; k++) {
-							System.out.printf("%x ", succ[k]);
-						}
-						System.out.println();
-						System.exit(0);
+					neigh = list.get(Main.getInt(succ,i));	//array out of bound
+					if (neigh == null) {
+						neigh = new Node(Main.getInt(succ,i));
+						list.put(neigh.id, neigh);
 					}
 					cost = Main.getInt(succ,i+4);
 					if (temp.cost != Integer.MAX_VALUE) {
