@@ -13,6 +13,7 @@ import java.io.FileWriter;
 import java.util.Comparator;
 import java.util.PriorityQueue;
 import java.util.Arrays;
+import java.io.PrintWriter;
 
 public class Main {
 	public static void main(String[] args) {
@@ -34,10 +35,11 @@ public class Main {
 
 	public static int getInt(byte[] buf, int start) {
 		int x = 0;
+		// System.out.printf("%x %x %x %x\n", buf[start], buf[start+1], buf[start+2], buf[start+3]);
 		for (int i=0; i<4; i++) {
-			x = x << 8;
-			x = x | buf[start+i];
+			x = (x << 8) | (0xff & buf[start+i]);
 		}
+		// System.out.printf("%x %d\n",x,x);
 		return x;
 	}
 }
@@ -118,7 +120,7 @@ class Router {
 
 		HashMap<Integer,byte[]> lsa = new HashMap<Integer,byte[]>();
 		HelloSender sender = new HelloSender(neighbors,ds,helloInt,id,map);
-		LSA lsaSender = new LSA(ds, costs, neighbors, id, lsaInt);
+		LSA lsaSender = new LSA(ds, costs, neighbors, id, lsaInt, lsa);
 		Topology plot = new Topology(lsa, neighbors, id, spfInt, outFileName);
 		sender.start();
 		lsaSender.start();
@@ -183,13 +185,15 @@ class LSA extends Thread {
 	private ArrayList<Integer> neighbors = null;
 	private HashMap<Integer,Integer> costs = null;
 	private int id;
+	HashMap<Integer,byte[]> lsaData = null;
 
-	public LSA(DatagramSocket soc, HashMap<Integer,Integer> hm, ArrayList<Integer> al, int mid, int time) {
+	public LSA(DatagramSocket soc, HashMap<Integer,Integer> hm, ArrayList<Integer> al, int mid, int time,HashMap<Integer,byte[]> data) {
 		ds = soc;
 		neighbors = al;
 		costs = hm;
 		id = mid;
 		interval = time;
+		lsaData = data;
 	}
 
 	@Override
@@ -198,17 +202,18 @@ class LSA extends Thread {
 		int i, entries;
 		DatagramPacket dp;
 		entries = neighbors.size();
-		byte[] message = new byte[entries*4+13];
-		System.out.println("id: "+id+" main "+message.length);
+		byte[] message = new byte[entries*8+13];
+		// System.out.println("id: "+id+" main "+message.length);
 		int m_count = 0;
 
 		try {
 			while(true) {
 				m_count = 0;
 				message[0] = 0x1;	//lsa datagram
-				i = Main.fillBytes(message,1,id);//id
-				i = Main.fillBytes(message,i,seqNo);//sequence no.
-				i = Main.fillBytes(message,i,entries); //no. of entries
+				Main.fillBytes(message,1,id);//id
+				Main.fillBytes(message,5,seqNo);//sequence no.
+				// Main.fillBytes(message,i,entries); //no. of entries
+				i = 13;
 				for (int j=0; j<entries; j++) {
 					if (costs.containsKey(neighbors.get(j))) {
 						Main.fillBytes(message,i,neighbors.get(j));//neighbour id
@@ -217,11 +222,12 @@ class LSA extends Thread {
 						m_count++;
 					}
 				}
+				lsaData.put(id, Arrays.copyOf(message,13+m_count*8));
 				Main.fillBytes(message,9,m_count);
 				for (int j=0; j<entries; j++) {
 
-					System.out.println("id: "+id+" count "+m_count);
-					System.out.println("-- "+message.length);
+					// System.out.println("id: "+id+" count "+m_count);
+					// System.out.printf("%d ------> %d\n",message.length, 13+m_count*8);
 					dp = new DatagramPacket(message,13+m_count*8,new InetSocketAddress("localhost",10000+neighbors.get(j)));
 					ds.send(dp);
 				}
@@ -279,6 +285,7 @@ class Topology extends Thread {
 	private HashMap<Integer,byte[]> lsas = null;
 	private int id;
 	private String outfile;
+	private PrintWriter pw = null;
 
 	public Topology(HashMap<Integer,byte[]> hm, ArrayList<Integer> al, int mid, int time, String file) {
 		neighbors = al;
@@ -292,6 +299,7 @@ class Topology extends Thread {
 	public void run() {
 		Node root = new Node(id,0);
 		try {
+			pw = new PrintWriter(outfile);
 			while(true) {
 				Thread.sleep(1000*interval);
 				createGraph(root);
@@ -319,23 +327,46 @@ class Topology extends Thread {
 		}
 		temp = new Node(id,0);
 		list.put(id, temp);
+		// if (lsas.get(temp.id) != null) {
+		// 	// System.out.println(lsas.get(temp.id));
+		// 	// System.out.println("not null");
+		// } else {
+		// 	// System.out.println("null");
+		// }
 		byte[] succ;
 		int cost;
 		Node neigh = null;
 		int sum;
+		// int count = 0;
 		while (temp != null) {
 			succ = lsas.get(temp.id);
 			if (succ != null) {
+				// count++;
+
 				int entry_count = Main.getInt(succ,9);
 				for (int i=13, j=0; j<entry_count; j++, i+=8) {
-					neigh = list.get(Main.getInt(succ,i));	//array out of bound
+					try {
+						neigh = list.get(Main.getInt(succ,i));	//array out of bound
+					} catch (Exception e) {
+						e.printStackTrace();
+						System.out.printf("%d %d %d %d\n", entry_count, i, j, succ.length);
+						for (int k=0; k<succ.length; k++) {
+							System.out.printf("%x ", succ[k]);
+						}
+						System.out.println();
+						System.exit(0);
+					}
 					cost = Main.getInt(succ,i+4);
-					sum = temp.cost + cost;
-					if (sum < neigh.cost) {
-						neigh.cost = sum;
-						neigh.parent = temp;
-						q.remove(neigh);
-						q.add(neigh);
+					if (temp.cost != Integer.MAX_VALUE) {
+						// System.out.printf("-----------%d %d %d %d %d\n", temp.id, temp.cost, neigh.cost, cost, neigh.id);
+						sum = temp.cost + cost;
+						if (sum < neigh.cost) {
+							// System.out.printf("inside %d %d %d %d\n", neigh.id, sum, temp.cost, cost);
+							neigh.cost = sum;
+							neigh.parent = temp;
+							q.remove(neigh);
+							q.add(neigh);
+						}
 					}
 				}
 			}
@@ -347,12 +378,14 @@ class Topology extends Thread {
 	private void printGraph(HashMap<Integer,Node> list) {
 		Node start = list.get(id);
 		Node temp, curr;
-		FileWriter fw = null;
+		// FileWriter fw = null;
 		try {
-			fw = new FileWriter(outfile, true);
-			fw.write("Routing Table for Node No. "+id+" at Time "+(System.currentTimeMillis()/1000));
-			fw.write("\n");
-			fw.write("Destination\t Path\t Cost\n");
+			// fw = new FileWriter(outfile, true);
+			// fw.write("Routing Table for Node No. "+id+" at Time "+(System.currentTimeMillis()/1000));
+			pw.println("Routing Table for Node No. "+id+" at Time "+(System.currentTimeMillis()/1000));
+			// fw.write("\n");
+			// fw.write("Destination\t Path\t Cost\n");
+			pw.println("Destination\t Path\t Cost");
 			for (Iterator itr = list.keySet().iterator(); itr.hasNext(); ) {
 				temp = list.get(itr.next());
 				curr = temp;
@@ -363,25 +396,32 @@ class Topology extends Thread {
 					curr = curr.parent;
 				}
 				if (path.size() > 0 && curr != null) {
-					fw.write(temp.id);
-					fw.write("\t");
+					// fw.write(temp.id);
+					pw.print(temp.id);
+					// fw.write("\t");
+					pw.print("\t");
 					Iterator ii = path.iterator();
-					fw.write((Integer)ii.next());
+					// fw.write((Integer)ii.next());
+					pw.print(ii.next());
 					while(ii.hasNext()) {
-						fw.write("-"+ii.next());
+						// fw.write("-"+ii.next());
+						pw.print("-"+ii.next());
 					}
-					fw.write("\t"+temp.cost+"\n");
+					// fw.write("\t"+temp.cost+"\n");
+					pw.print("\t"+temp.cost+"\n");
 				}
 			}
-			fw.write("\n");
+			// fw.write("\n");
+			pw.println("");
+			pw.flush();
 		} catch (Exception e) {
 			e.printStackTrace();
-		} finally {
 			try {
-				fw.close();
+				// fw.close();
+				pw.close();
 			} catch (Exception ee) {
 				ee.printStackTrace();
-			}			
+			}
 		}
 	}
 }
